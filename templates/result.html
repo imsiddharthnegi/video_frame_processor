@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Processing Results</title>
+    <link href="https://cdn.replit.com/agent/bootstrap-agent-dark-theme.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/style.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="display-5 mb-2">
+                            <i class="fas fa-images text-primary me-3"></i>
+                            {% if is_similarity_search %}
+                                Similar Frames
+                            {% else %}
+                                Processing Results
+                            {% endif %}
+                        </h1>
+                        {% if video_id %}
+                            <p class="text-muted">Video ID: <code>{{ video_id }}</code></p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <a href="/" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left me-2"></i>
+                            Back to Upload
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="row mb-4">
+                    <div class="col-12">
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                <i class="fas fa-{{ 'exclamation-triangle' if category == 'error' else 'check-circle' }} me-2"></i>
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <!-- Query Frame (for similarity search) -->
+        {% if is_similarity_search and query_frame %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header bg-info text-white">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-crosshairs me-2"></i>
+                                Query Frame
+                            </h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row align-items-center">
+                                <div class="col-md-4">
+                                    <img src="/frame/{{ query_frame.get('id') or query_frame.get('frame_id') }}" 
+                                         class="img-fluid rounded shadow-sm" 
+                                         alt="Query Frame">
+                                </div>
+                                <div class="col-md-8">
+                                    <h6>Frame Details</h6>
+                                    <ul class="list-unstyled">
+                                        <li><strong>Timestamp:</strong> {{ "%.2f"|format(query_frame.timestamp) }}s</li>
+                                        <li><strong>Frame Number:</strong> {{ query_frame.frame_number }}</li>
+                                        <li><strong>Video ID:</strong> <code>{{ query_frame.video_id }}</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Results Grid -->
+        {% if frames or similar_frames %}
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="card-title mb-0">
+                                <i class="fas fa-th-large me-2"></i>
+                                {% if is_similarity_search %}
+                                    Similar Frames ({{ similar_frames|length }} found)
+                                {% else %}
+                                    Extracted Frames ({{ frames|length }} total)
+                                {% endif %}
+                            </h5>
+                            <div class="btn-group" role="group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="changeView('grid')">
+                                    <i class="fas fa-th"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" onclick="changeView('list')">
+                                    <i class="fas fa-list"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            <div id="gridView" class="row">
+                                {% set items = similar_frames if is_similarity_search else frames %}
+                                {% for item in items %}
+                                    <div class="col-lg-3 col-md-4 col-sm-6 mb-4">
+                                        <div class="card frame-card">
+                                            <div class="frame-image-container">
+                                                <img src="/frame/{{ item.id }}" 
+                                                     class="card-img-top frame-image" 
+                                                     alt="Frame {{ item.get('frame_number', 'N/A') }}"
+                                                     loading="lazy">
+                                                {% if is_similarity_search and item.similarity is defined %}
+                                                    <div class="similarity-badge">
+                                                        {{ "%.3f"|format(item.similarity) }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                            <div class="card-body p-3">
+                                                <h6 class="card-title mb-2">
+                                                    Frame #{{ item.get('frame_number', item.get('metadata', {}).get('frame_number', 'N/A')) }}
+                                                </h6>
+                                                <div class="frame-info">
+                                                    <small class="text-muted d-block">
+                                                        <i class="fas fa-clock me-1"></i>
+                                                        {% set timestamp = item.timestamp if item.timestamp is defined else item.get('metadata', {}).get('timestamp', 0) %}
+                                                        {{ "%.2f"|format(timestamp) }}s
+                                                    </small>
+                                                    {% if is_similarity_search and item.similarity is defined %}
+                                                        <small class="text-info d-block">
+                                                            <i class="fas fa-percentage me-1"></i>
+                                                            {{ "%.1f"|format(item.similarity * 100) }}% similar
+                                                        </small>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="mt-2">
+                                                    {% if not is_similarity_search %}
+                                                        <a href="/search_similar/{{ item.id }}" 
+                                                           class="btn btn-sm btn-primary">
+                                                            <i class="fas fa-search me-1"></i>
+                                                            Find Similar
+                                                        </a>
+                                                    {% endif %}
+                                                    <button class="btn btn-sm btn-outline-secondary" 
+                                                            onclick="showFrameDetails('{{ item.id }}', {{ item|tojson }})">
+                                                        <i class="fas fa-info-circle me-1"></i>
+                                                        Details
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            <!-- List View (initially hidden) -->
+                            <div id="listView" class="d-none">
+                                <div class="table-responsive">
+                                    <table class="table table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Preview</th>
+                                                <th>Frame #</th>
+                                                <th>Timestamp</th>
+                                                {% if is_similarity_search %}
+                                                    <th>Similarity</th>
+                                                {% endif %}
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for item in items %}
+                                                <tr>
+                                                    <td>
+                                                        <img src="/frame/{{ item.id }}" 
+                                                             class="table-frame-preview" 
+                                                             alt="Frame preview"
+                                                             style="width: 80px; height: 60px; object-fit: cover;">
+                                                    </td>
+                                                    <td>{{ item.get('frame_number', item.get('metadata', {}).get('frame_number', 'N/A')) }}</td>
+                                                    <td>
+                                                        {% set timestamp = item.timestamp if item.timestamp is defined else item.get('metadata', {}).get('timestamp', 0) %}
+                                                        {{ "%.2f"|format(timestamp) }}s
+                                                    </td>
+                                                    {% if is_similarity_search %}
+                                                        <td>
+                                                            {% if item.similarity is defined %}
+                                                                <span class="badge bg-info">{{ "%.3f"|format(item.similarity) }}</span>
+                                                            {% endif %}
+                                                        </td>
+                                                    {% endif %}
+                                                    <td>
+                                                        {% if not is_similarity_search %}
+                                                            <a href="/search_similar/{{ item.id }}" 
+                                                               class="btn btn-sm btn-primary me-1">
+                                                                <i class="fas fa-search"></i>
+                                                            </a>
+                                                        {% endif %}
+                                                        <button class="btn btn-sm btn-outline-secondary" 
+                                                                onclick="showFrameDetails('{{ item.id }}', {{ item|tojson }})">
+                                                            <i class="fas fa-info-circle"></i>
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-exclamation-circle fa-3x text-muted mb-3"></i>
+                            <h5>No Frames Found</h5>
+                            <p class="text-muted">No frames were found for this video or search query.</p>
+                            <a href="/" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i>
+                                Upload Another Video
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Frame Details Modal -->
+    <div class="modal fade" id="frameDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Frame Details
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <img id="modalFrameImage" src="" class="img-fluid rounded" alt="Frame">
+                        </div>
+                        <div class="col-md-6">
+                            <dl id="frameDetailsContent">
+                                <!-- Details will be populated by JavaScript -->
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <a id="frameDownloadLink" href="" class="btn btn-primary" download>
+                        <i class="fas fa-download me-2"></i>
+                        Download Frame
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function changeView(viewType) {
+            const gridView = document.getElementById('gridView');
+            const listView = document.getElementById('listView');
+            
+            if (viewType === 'grid') {
+                gridView.classList.remove('d-none');
+                listView.classList.add('d-none');
+            } else {
+                gridView.classList.add('d-none');
+                listView.classList.remove('d-none');
+            }
+        }
+
+        function showFrameDetails(frameId, frameData) {
+            const modal = new bootstrap.Modal(document.getElementById('frameDetailsModal'));
+            const modalImage = document.getElementById('modalFrameImage');
+            const modalContent = document.getElementById('frameDetailsContent');
+            const downloadLink = document.getElementById('frameDownloadLink');
+            
+            // Set image
+            modalImage.src = `/frame/${frameId}`;
+            downloadLink.href = `/frame/${frameId}`;
+            
+            // Build details content
+            let detailsHtml = `
+                <dt>Frame ID</dt>
+                <dd><code>${frameId}</code></dd>
+            `;
+            
+            if (frameData.frame_number !== undefined) {
+                detailsHtml += `
+                    <dt>Frame Number</dt>
+                    <dd>${frameData.frame_number}</dd>
+                `;
+            } else if (frameData.metadata && frameData.metadata.frame_number !== undefined) {
+                detailsHtml += `
+                    <dt>Frame Number</dt>
+                    <dd>${frameData.metadata.frame_number}</dd>
+                `;
+            }
+            
+            if (frameData.timestamp !== undefined) {
+                detailsHtml += `
+                    <dt>Timestamp</dt>
+                    <dd>${frameData.timestamp.toFixed(2)}s</dd>
+                `;
+            } else if (frameData.metadata && frameData.metadata.timestamp !== undefined) {
+                detailsHtml += `
+                    <dt>Timestamp</dt>
+                    <dd>${frameData.metadata.timestamp.toFixed(2)}s</dd>
+                `;
+            }
+            
+            if (frameData.similarity !== undefined) {
+                detailsHtml += `
+                    <dt>Similarity Score</dt>
+                    <dd>
+                        <span class="badge bg-info">${frameData.similarity.toFixed(3)}</span>
+                        <small class="text-muted">(${(frameData.similarity * 100).toFixed(1)}%)</small>
+                    </dd>
+                `;
+            }
+            
+            if (frameData.vector_size !== undefined) {
+                detailsHtml += `
+                    <dt>Vector Size</dt>
+                    <dd>${frameData.vector_size} dimensions</dd>
+                `;
+            }
+            
+            if (frameData.created_at !== undefined) {
+                detailsHtml += `
+                    <dt>Created</dt>
+                    <dd>${new Date(frameData.created_at).toLocaleString()}</dd>
+                `;
+            }
+            
+            modalContent.innerHTML = detailsHtml;
+            modal.show();
+        }
+
+        // Lazy loading for images
+        if ('IntersectionObserver' in window) {
+            const imageObserver = new IntersectionObserver((entries, observer) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const img = entry.target;
+                        img.src = img.dataset.src || img.src;
+                        img.classList.remove('lazy');
+                        observer.unobserve(img);
+                    }
+                });
+            });
+
+            document.querySelectorAll('.frame-image').forEach(img => {
+                imageObserver.observe(img);
+            });
+        }
+    </script>
+</body>
+</html>
