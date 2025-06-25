@@ -12,12 +12,12 @@ app = FastAPI()
 FRAME_DIR = "frames"
 os.makedirs(FRAME_DIR, exist_ok=True)
 
-QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
-COLLECTION_NAME = "frames"
-VECTOR_SIZE = 256
+from qdrant_client import QdrantClient
 
-client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
+QDRANT_HOST = "https://71d0f16d-b032-432e-8aa2-5dd6b7afee4d.europe-west3-0.gcp.cloud.qdrant.io"  # (from your Qdrant Cloud dashboard)
+QDRANT_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.TkLAfO_fT2c7mzMnbgW9qU5YpkA-1W5IODdWFhUkqQY"  # (from your Qdrant Cloud dashboard)
+client = QdrantClient(url= https://71d0f16d-b032-432e-8aa2-5dd6b7afee4d.europe-west3-0.gcp.cloud.qdrant.io , api_key= eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.TkLAfO_fT2c7mzMnbgW9qU5YpkA-1W5IODdWFhUkqQY)
+
 
 if COLLECTION_NAME not in [c.name for c in client.get_collections().collections]:
     client.recreate_collection(
