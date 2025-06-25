@@ -1,6 +1,5 @@
 fastapi
 uvicorn
 opencv-python
-qdrant-client
 numpy
-python-multipart
+qdrant-client
